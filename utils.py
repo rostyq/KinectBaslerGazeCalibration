@@ -1,4 +1,82 @@
 import numpy as np
+import cv2
+
+
+class HDFace:
+    
+    All = list(range(0, 1347))
+    
+    LeftEyeInnercorner = 210
+    LeftEyeOutercorner = 469
+    LeftEyeMidtop = 241
+    LeftEyeMidbottom = 1104
+    
+    RightEyeInnercorner = 843
+    RightEyeOutercorner = 1117
+    RightEyeMidtop = 731
+    RightEyeMidbottom = 1090
+    
+    LeftEyeBrowInner = 346
+    LeftEyeBrowOuter = 140
+    LeftEyeBrowCenter = 222
+    
+    RightEyeBrowInner = 803
+    RightEyeBrowOuter = 758
+    RightEyeBrowCenter = 849
+    
+    RightEyeInnerLid = [776,  777,  846,  843,  1098, 
+                         1097,  1095,  1096,  1096,  1091, 
+                         1090,  1092,  1099,  1094,  1093, 
+                         1100,  1101,  1102,  1117,  1071, 
+                         1012,  992,  987,  752,  749, 
+                         876,  733,  731,  728]
+    LeftEyeInnerLid = [210, 316, 187, 153, 121,
+                        241, 244, 238, 137, 211,
+                        188, 287, 440, 1116, 469,
+                        1115, 1114, 1113, 1107, 1106,
+                        1112, 1105, 1104, 1103, 1108,
+                        1109, 1111, 1110]
+    
+    MouthLeftcorner = 91
+    MouthRightcorner = 687
+    MouthUpperlipMidtop = 19
+    MouthUpperlipMidbottom = 1072
+    MouthLowerlipMidtop = 10
+    MouthLowerlipMidbottom = 8
+    
+    NoseTip = 18
+    NoseBottom = 14
+    NoseBottomLeft = 156
+    NoseBottomRight = 783
+    NoseTop = 24
+    NoseTopLeft = 151
+    NoseTopRight = 772
+    
+    ForeheadCenter = 28
+    
+    LeftCheekCenter = 412
+    RightCheekCenter = 933
+    LeftCheekbone = 458
+    RightCheekbone = 674
+    
+    ChinCenter = 4
+    
+    LowerJawLeftEnd = 1307
+    LowerJawRightEnd = 1327
+    
+    @classmethod
+    def items(cls):
+        return {attr_name: getattr(cls, attr_name)
+                for attr_name in dir(cls) if not attr_name.startswith('__') and not callable(getattr(cls, attr_name))}
+    
+    @classmethod
+    def values(cls):
+        return iter([value for key, value in cls.items().items()])
+    
+    @classmethod
+    def keys(cls):
+        return iter([key for key, value in cls.items().items()])
+    
 
 def vecs2angles(vectors):
     """
@@ -73,3 +151,57 @@ def calc_angle_spherical(a1, a2, deg=True):
         return np.rad2deg(angle)
     else:
         return angle
+    
+    
+def to_tuple(dct):
+    return tuple(int(item) for key, item in dct.items())
+
+
+def extract_rectangle(img, pt0, pt1):
+    return img[pt0[1]:pt1[1], pt0[0]:pt1[0]]
+
+
+def dict_to_np(dict_data):
+    return np.array([value for axis, value in dict_data.items()]).reshape(-1, len(dict_data))
+
+
+def add_dummy_z(arr_2d):
+    if isinstance(arr_2d, dict):
+        arr_2d = dict_to_np(arr_2d)
+    return np.column_stack((arr_2d, np.full(arr_2d.shape[0], 1)))
+
+
+def to_json(vector, scale=1):
+    return {axis: value * scale for axis, value in zip('XYZ', vector)}
+
+
+def vectors_to(vectors, rotations, translations=None, to='self'):
+    if translations is None:
+        translations = np.zeros(vectors.shape)
+        
+    arr = zip(vectors, rotations, translations)
+
+    if to is 'self':
+        return np.array([(np.linalg.inv(cv2.Rodrigues(R)[0]) @ (V - T).reshape(3, 1)).flatten() for V, R, T in arr])
+    elif to is 'origin':
+        return np.array([(cv2.Rodrigues(R)[0] @ V.reshape(3, 1) + T.reshape(3, 1)).flatten() for V, R, T in arr])
+    
+    
+def quaternion_to_rotation(quaternion):
+    """
+    Converts angle-axis to quaternion
+    :param quaternion: dict {'X': , 'Y': , 'Z': , 'W': }
+    :return: angle-axis rotation vector
+    """
+    if isinstance(quaternion, dict):
+        quaternion = dict_to_np(quaternion).flatten()
+        
+    assert quaternion.ndim == 1
+    assert quaternion.shape == (4,)
+    
+    t = np.sqrt(1 - quaternion[-1] ** 2)
+    
+    if t:
+        return (quaternion[:3] / t)
+    else:
+        return np.zeros((3,))
