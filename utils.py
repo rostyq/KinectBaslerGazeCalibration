@@ -2,6 +2,15 @@ import numpy as np
 import cv2
 
 
+class Color:
+    
+    Blue = (0, 0, 255)
+    Red = (255, 0, 0)
+    Green = (0, 255, 0)
+    Black = (0, 0, 0)
+    White = (255, 255, 255)
+    
+
 class HDFace:
     
     All = list(range(0, 1347))
@@ -182,9 +191,9 @@ def vectors_to(vectors, rotations, translations=None, to='self'):
     arr = zip(vectors, rotations, translations)
 
     if to is 'self':
-        return np.array([(np.linalg.inv(cv2.Rodrigues(R)[0]) @ (V - T).reshape(3, 1)).flatten() for V, R, T in arr])
+        return np.array([(np.linalg.inv(cv2.Rodrigues(R)[0]) @ (V - T).T).flatten() for V, R, T in arr])
     elif to is 'origin':
-        return np.array([(cv2.Rodrigues(R)[0] @ V.reshape(3, 1) + T.reshape(3, 1)).flatten() for V, R, T in arr])
+        return np.array([(cv2.Rodrigues(R)[0] @ V.T + T.T).flatten() for V, R, T in arr])
     
     
 def quaternion_to_rotation(quaternion):
@@ -205,3 +214,53 @@ def quaternion_to_rotation(quaternion):
         return (quaternion[:3] / t)
     else:
         return np.zeros((3,))
+    
+    
+def plane_line_intersection(line_points, plane_points):
+
+    """
+    Compute intersection point of plane and lineself.
+    Parameter line_points consists of two points and stands to determine
+    line's equesion:
+        (x - x_1)/(x_2 - x_1) =
+       =(y - y_1)/(y_2 - y_1) =
+       =(z - z_1)/(z_2 - z_1).
+    Parameter plane_points consists of three points and stands to determine
+    plane's equation:
+        A*x + B*y + C*z = D.
+    This function returns 3D coordinates of intersection point.
+    """
+    
+    assert isinstance(line_points, np.ndarray), str(type(line_points))
+    assert isinstance(plane_points, np.ndarray), str(type(plane_points))
+    
+    assert line_points.shape == (2, 3), str(line_points.shape)
+    assert plane_points.shape == (3, 3), str(plane_points.shape) 
+    
+    line_point_1, line_point_2 = line_points
+    plane_point_1, plane_point_2, plane_point_3 = plane_points
+
+    # These two vectors are in the plane.
+    vector_1 = plane_point_3 - plane_point_1
+    vector_2 = plane_point_2 - plane_point_1
+
+    # The cross prodaction is a normal vector to the plane.
+    A3 = np.cross(vector_1, vector_2)
+    B3 = np.dot(A3, plane_point_3)
+
+    # Compute the solution of equasion A * x = B.
+    # Compute matrix A.
+    line_points_diff = line_point_2 - line_point_1
+    A1 = np.array([1, -1]) / line_points_diff[:2] 
+    A2 = np.array([1, -1]) / line_points_diff[1:]
+    
+    A = np.array([[*A1, 0.0], [0.0, *A2], [*A3]])
+
+    # Compute vector B.
+    B1 = np.sum(line_point_1[:2] * A1)
+    B2 = np.sum(line_point_1[1:] * A2)
+    
+    B = np.array([B1, B2, B3])
+    
+    # Compute intersection point.
+    return np.linalg.solve(A, B)

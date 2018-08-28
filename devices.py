@@ -75,7 +75,7 @@ class Device:
         self.extrinsic_matrix = self.restore_extrinsic_matrix(self.rotation_matrix,
                                                               self.translation)
 
-    def vectors_to_self(self, vectors):
+    def vectors_to_self(self, vectors, translation=True):
         """
         (?, 3) -> (?, 3)
 
@@ -83,10 +83,13 @@ class Device:
         """
         assert vectors.ndim == 2
         assert vectors.shape[1] == 3
-
-        return (inv(self.rotation_matrix) @ (vectors - self.translation).T).T
-
-    def vectors_to_origin(self, vectors):
+        
+        if translation:
+            return (inv(self.rotation_matrix) @ (vectors - self.translation).T).T
+        else:
+            return (inv(self.rotation_matrix) @ vectors.T).T
+        
+    def vectors_to_origin(self, vectors, translation=True):
         """
         (?, 3) -> (?, 3)
 
@@ -94,8 +97,11 @@ class Device:
         """
         assert vectors.ndim == 2
         assert vectors.shape[1] == 3
-
-        return (self.rotation_matrix @ vectors.T + self.translation.T).T
+        
+        if translation:
+            return (self.rotation_matrix @ vectors.T + self.translation.T).T
+        else:
+            return (self.rotation_matrix @ vectors.T).T
 
     @classmethod
     def get(cls, name):
@@ -127,7 +133,7 @@ class Camera(Device):
     default_distortion = zeros((4,), dtype='float')
 
     def __init__(self, name='camera', translation=None, rotation=None, matrix=None, distortion=None, scale=None):
-        super().__init__(name, translation, rotation)
+        super().__init__(name, translation=translation, rotation=rotation)
 
         self.matrix = array(matrix) if matrix else self.default_matrix
         self.distortion = array(distortion) if distortion else self.default_distortion
